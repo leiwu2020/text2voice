@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Voice Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-group textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-upload {
+            border: 2px dashed #e1e5e9;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .file-upload.dragover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .file-upload-text {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .convert-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            font-weight: 600;
+        }
+
+        .convert-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .convert-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result-section.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result-section.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .audio-player {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .download-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .or-divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .or-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e1e5e9;
+        }
+
+        .or-divider span {
+            background: white;
+            padding: 0 20px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 30px 20px;
+            }
+            
+            .result-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Text to Voice Converter</h1>
+            <p>Convert your text into natural-sounding speech</p>
+        </div>
+        
+        <div class="main-content">
+            <form id="conversionForm">
+                <div class="input-section">
+                    <div class="input-group">
+                        <label for="textInput">Enter your text:</label>
+                        <textarea id="textInput" name="text" placeholder="Type or paste your text here..."></textarea>
+                    </div>
+                    
+                    <div class="or-divider">
+                        <span>OR</span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Upload a text file:</label>
+                        <div class="file-upload" id="fileUpload">
+                            <div class="file-upload-icon">📁</div>
+                            <div class="file-upload-text">
+                                <strong>Click to upload</strong> or drag and drop<br>
+                                <small>Only .txt files are supported</small>
+                            </div>
+                            <input type="file" id="fileInput" name="file" accept=".txt">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="convert-btn" id="convertBtn">
+                    Convert to Speech
+                </button>
+            </form>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Converting text to speech...</p>
+            </div>
+            
+            <div class="result-section" id="resultSection">
+                <div class="result-content">
+                    <div class="audio-player">
+                        <audio id="audioPlayer" controls style="width: 100%;">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                    <a href="#" class="download-btn" id="downloadBtn" download>
+                        Download MP3
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('conversionForm');
+        const textInput = document.getElementById('textInput');
+        const fileInput = document.getElementById('fileInput');
+        const fileUpload = document.getElementById('fileUpload');
+        const convertBtn = document.getElementById('convertBtn');
+        const loading = document.getElementById('loading');
+        const resultSection = document.getElementById('resultSection');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // File upload handling
+        fileUpload.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (file.name.endsWith('.txt')) {
+                    fileUpload.style.borderColor = '#28a745';
+                    fileUpload.style.background = '#d4edda';
+                    fileUpload.querySelector('.file-upload-text').innerHTML = 
+                        `<strong>${file.name}</strong> selected<br><small>Click to change file</small>`;
+                } else {
+                    alert('Please select a .txt file');
+                    fileInput.value = '';
+                }
+            }
+        });
+
+        // Drag and drop functionality
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.txt')) {
+                    fileInput.files = files;
+                    fileUpload.style.borderColor = '#28a745';
+                    fileUpload.style.background = '#d4edda';
+                    fileUpload.querySelector('.file-upload-text').innerHTML = 
+                        `<strong>${file.name}</strong> selected<br><small>Click to change file</small>`;
+                } else {
+                    alert('Please drop a .txt file');
+                }
+            }
+        });
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const text = textInput.value.trim();
+            const file = fileInput.files[0];
+            
+            if (!text && !file) {
+                alert('Please enter text or upload a file');
+                return;
+            }
+            
+            // Show loading state
+            loading.style.display = 'block';
+            resultSection.style.display = 'none';
+            convertBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                if (text) formData.append('text', text);
+                if (file) formData.append('file', file);
+                
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Set audio source
+                    audioPlayer.src = result.play_url;
+                    
+                    // Set download link
+                    downloadBtn.href = result.download_url;
+                    downloadBtn.download = result.filename;
+                    
+                    // Show result
+                    resultSection.className = 'result-section success';
+                    resultSection.style.display = 'block';
+                    
+                    // Clear form
+                    textInput.value = '';
+                    fileInput.value = '';
+                    fileUpload.style.borderColor = '#e1e5e9';
+                    fileUpload.style.background = '#f8f9fa';
+                    fileUpload.querySelector('.file-upload-text').innerHTML = 
+                        '<strong>Click to upload</strong> or drag and drop<br><small>Only .txt files are supported</small>';
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                resultSection.className = 'result-section error';
+                resultSection.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+                resultSection.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                convertBtn.disabled = false;
+            }
+        });
+
+        // Auto-cleanup old files every hour
+        setInterval(async () => {
+            try {
+                await fetch('/cleanup', { method: 'POST' });
+            } catch (error) {
+                console.log('Cleanup failed:', error);
+            }
+        }, 3600000); // 1 hour
+    </script>
+</body>
+</html>

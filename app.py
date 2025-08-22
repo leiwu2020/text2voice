@@ -1,0 +1,95 @@
+import os
+import uuid
+import time
+from flask import Flask, render_template, request, jsonify, send_file, url_for
+from gtts import gTTS
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['OUTPUT_FOLDER'] = 'outputs'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Create necessary directories
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
+
+@app.route('/')
+def index():
+    """Render the main page."""
+    return render_template('index.html')
+
+@app.route('/convert', methods=['POST'])
+def convert_text_to_speech():
+    """Convert text to speech using Google TTS."""
+    try:
+        text = request.form.get('text', '').strip()
+        uploaded_file = request.files.get('file')
+        
+        if not text and not uploaded_file:
+            return jsonify({'error': 'Please provide text or upload a file'}), 400
+        
+        # If file is uploaded, read its content
+        if uploaded_file and uploaded_file.filename:
+            if not uploaded_file.filename.endswith('.txt'):
+                return jsonify({'error': 'Please upload a .txt file'}), 400
+            
+            # Read file content
+            file_content = uploaded_file.read().decode('utf-8')
+            text = file_content.strip()
+        
+        if not text:
+            return jsonify({'error': 'No text content found'}), 400
+        
+        # Generate unique filename
+        unique_id = str(uuid.uuid4())
+        audio_filename = f"speech_{unique_id}.mp3"
+        
+        # Convert text to speech using gTTS
+        tts = gTTS(text=text, lang='en', slow=False)
+        
+        # Save audio file
+        audio_path = os.path.join(app.config['OUTPUT_FOLDER'], audio_filename)
+        tts.save(audio_path)
+        
+        return jsonify({
+            'success': True,
+            'filename': audio_filename,
+            'download_url': url_for('download_file', filename=audio_filename),
+            'play_url': url_for('download_file', filename=audio_filename)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Download a generated audio file."""
+    try:
+        file_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True, download_name=filename)
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Download failed: {str(e)}'}), 500
+
+@app.route('/cleanup', methods=['POST'])
+def cleanup_files():
+    """Clean up old files (older than 1 hour)."""
+    try:
+        current_time = time.time()
+        
+        for folder in [app.config['OUTPUT_FOLDER'], app.config['UPLOAD_FOLDER']]:
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                if os.path.isfile(file_path):
+                    file_age = current_time - os.path.getmtime(file_path)
+                    if file_age > 3600:  # 1 hour
+                        os.remove(file_path)
+        
+        return jsonify({'success': True, 'message': 'Cleanup completed'})
+    except Exception as e:
+        return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
