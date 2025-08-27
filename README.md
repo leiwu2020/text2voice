@@ -1,184 +1,176 @@
-# Text to Voice Converter
+# Text2Voice Web Application
 
-A web application that converts text input or uploaded text files into speech audio files. Built with Flask and gTTS (Google Text-to-Speech).
+A Flask-based web application that converts text to speech using espeak and ffmpeg.
 
-## Features
-
-- **Text Input**: Type or paste text directly into the web interface
-- **File Upload**: Upload .txt files for conversion
-- **Drag & Drop**: Support for drag and drop file uploads
-- **Audio Playback**: Built-in audio player to preview the generated speech
-- **Download**: Download the generated MP4 audio files
-- **Responsive Design**: Modern, mobile-friendly interface
-- **Auto-cleanup**: Automatic cleanup of old files
-
-## Installation
+## 🚀 Quick Start
 
 ### Prerequisites
+- Docker installed and running
+- AWS CLI configured with appropriate permissions
+- SSH key pair for EC2 access
 
-- Python 3.11
-- Conda (recommended) or pip
+### 1. Build and Push Docker Image to ECR
+```bash
+./build-and-push-ecr.sh
+```
 
-### Setup
+This script:
+- Builds the Docker image for AMD64 architecture
+- Creates ECR repository if it doesn't exist
+- Pushes the image to AWS ECR
 
-1. **Clone or navigate to the project directory:**
+**Options:**
+- `-h, --help` - Show help message
+- `-t, --tag` - Specify image tag (default: latest)
+
+### 2. Start EC2 Server
+```bash
+./start-ec2.sh
+```
+
+This script:
+- Launches a t3.medium EC2 instance in a public subnet
+- Creates security group with SSH (port 22) and Flask app (port 5000) access
+- Tags the instance for easy identification
+
+**Options:**
+- `-h, --help` - Show help message
+- `-t, --type` - Specify instance type (default: t3.medium)
+
+### 3. Deploy ECR Image to EC2
+```bash
+./deploy-ecr-to-ec2.sh <EC2_PUBLIC_IP>
+```
+
+This script:
+- Installs Docker and AWS CLI on the EC2 instance
+- Sets up the text2voice application directory
+- Pulls and runs the Docker image from ECR
+- Creates a systemd service for auto-start
+
+**Example:**
+```bash
+./deploy-ecr-to-ec2.sh 35.86.71.130
+```
+
+### 4. Stop EC2 Server
+```bash
+./stop-ec2.sh
+```
+
+This script:
+- Stops the running text2voice EC2 instance
+- Preserves instance data for later restart
+- Reduces AWS costs when not in use
+
+**Options:**
+- `-h, --help` - Show help message
+- `-f, --force` - Force stop without confirmation
+- `-s, --status` - Show instance status only
+- `-t, --terminate` - Terminate instance completely (deletes it)
+
+## 📋 Complete Workflow
+
+1. **Build and Push to ECR:**
    ```bash
-   cd text2voice
+   ./build-and-push-ecr.sh
    ```
 
-2. **Create and activate the conda environment:**
+2. **Start EC2 Instance:**
    ```bash
-   conda create -n text2voice python=3.11 -y
-   conda activate text2voice
+   ./start-ec2.sh
    ```
 
-3. **Install dependencies:**
+3. **Deploy Application:**
    ```bash
-   pip install -r requirements.txt
+   ./deploy-ecr-to-ec2.sh <PUBLIC_IP>
    ```
 
-## Usage
+4. **Access Application:**
+   - Web Interface: http://<PUBLIC_IP>:5000
+   - SSH Access: `ssh -i /path/to/key.pem ec2-user@<PUBLIC_IP>`
 
-### Starting the Application
-
-1. **Make sure you're in the text2voice environment:**
+5. **Stop When Done:**
    ```bash
-   conda activate text2voice
+   ./stop-ec2.sh
    ```
 
-2. **Run the Flask application:**
-   ```bash
-   python app.py
-   ```
+## 🔧 Configuration
 
-3. **Open your web browser and navigate to:**
-   ```
-   http://localhost:5000
-   ```
+### Key Pair Path
+Update the `KEY_PAIR_NAME` variable in the scripts to match your SSH key location:
+```bash
+KEY_PAIR_NAME="/path/to/your/key.pem"
+```
 
-### Using the Web Interface
+### AWS Region
+The scripts are configured for `us-west-2` (Oregon). Update `AMI_ID` in `start-ec2.sh` if using a different region.
 
-1. **Text Input Method:**
-   - Type or paste your text in the text area
-   - Click "Convert to Speech"
+### ECR Repository
+The ECR repository name is set to `text2voice-demo`. Update `ECR_REPO_NAME` in `build-and-push-ecr.sh` if needed.
 
-2. **File Upload Method:**
-   - Click the upload area or drag and drop a .txt file
-   - Only .txt files are supported
-   - Click "Convert to Speech"
+## 💰 Cost Management
 
-3. **After Conversion:**
-   - Use the built-in audio player to preview the speech
-   - Click "Download MP4" to save the file
+- **Running Instance**: ~$0.0416/hour
+- **Stopped Instance**: ~$0.00/hour (only storage costs)
+- **Monthly Savings**: ~$30 when stopped
 
-## File Structure
+## 🗑️ Cleanup
+
+To completely remove the instance and avoid storage costs:
+```bash
+./stop-ec2.sh --terminate
+```
+
+## 📁 Project Structure
 
 ```
 text2voice/
-├── app.py              # Main Flask application
-├── templates/
-│   └── index.html     # Web interface template
-├── uploads/           # Temporary upload directory
-├── outputs/           # Generated audio files
-├── requirements.txt   # Python dependencies
-└── README.md         # This file
+├── build-and-push-ecr.sh    # Build and push Docker image to ECR
+├── start-ec2.sh             # Launch EC2 instance
+├── deploy-ecr-to-ec2.sh     # Deploy ECR image to EC2
+├── stop-ec2.sh              # Stop/terminate EC2 instance
+├── Dockerfile                # Docker image definition
+├── app-docker.py            # Flask application for Docker
+├── requirements-docker.txt   # Python dependencies for Docker
+├── templates/                # HTML templates
+├── uploads/                  # File upload directory
+└── outputs/                  # Generated audio files
 ```
 
-## Technical Details
-
-- **Backend**: Flask web framework
-- **Text-to-Speech**: Google Text-to-Speech (gTTS)
-- **Audio Processing**: pydub for audio manipulation
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **File Formats**: Input: .txt, Output: .mp4 (audio)
-
-## API Endpoints
-
-- `GET /` - Main web interface
-- `POST /convert` - Convert text to speech
-- `GET /download/<filename>` - Download generated files
-- `POST /cleanup` - Clean up old files
-
-## Configuration
-
-The application can be configured by modifying the following in `app.py`:
-
-- **Upload folder**: `UPLOAD_FOLDER = 'uploads'`
-- **Output folder**: `OUTPUT_FOLDER = 'outputs'`
-- **Max file size**: `MAX_CONTENT_LENGTH = 16 * 1024 * 1024` (16MB)
-- **Server settings**: Host, port, debug mode
-
-## Troubleshooting
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-1. **Port already in use:**
-   - Change the port in `app.py` or kill the process using the port
+1. **Docker not running:**
+   ```bash
+   open -a Docker
+   ```
 
-2. **Audio not playing:**
-   - Check if the file was generated successfully
-   - Verify browser supports the audio format
+2. **AWS CLI not configured:**
+   ```bash
+   aws configure
+   ```
 
-3. **File upload errors:**
-   - Ensure the file is a .txt file
-   - Check file size (max 16MB)
+3. **Permission denied on scripts:**
+   ```bash
+   chmod +x *.sh
+   ```
 
-### Dependencies Issues
+4. **Instance not accessible:**
+   - Check security group rules
+   - Verify instance is in public subnet
+   - Wait for instance status checks to pass
 
-If you encounter issues with audio processing:
+### Getting Help
 
+Each script includes help information:
 ```bash
-# On macOS, you might need to install ffmpeg
-brew install ffmpeg
-
-# On Ubuntu/Debian
-sudo apt-get install ffmpeg
-
-# On Windows, download ffmpeg from the official website
+./script-name.sh --help
 ```
 
-## Development
+## 📚 Additional Resources
 
-### Adding New Features
-
-1. **New Text-to-Speech Engines:**
-   - Modify the `convert_text_to_speech` function in `app.py`
-   - Add new engine options to the frontend
-
-2. **Additional File Formats:**
-   - Extend file validation in the upload handler
-   - Add format conversion logic
-
-3. **Voice Customization:**
-   - Add language selection options
-   - Implement speed and pitch controls
-
-### Testing
-
-```bash
-# Run with debug mode
-python app.py
-
-# Test the API endpoints
-curl -X POST http://localhost:5000/convert \
-  -F "text=Hello, this is a test message"
-```
-
-## License
-
-This project is open source and available under the MIT License.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the Flask and gTTS documentation
-3. Open an issue in the repository
+- [AWS ECR Documentation](https://docs.aws.amazon.com/ecr/)
+- [AWS EC2 Documentation](https://docs.aws.amazon.com/ec2/)
+- [Docker Documentation](https://docs.docker.com/)
