@@ -442,6 +442,24 @@
                 console.log('Cleanup failed:', error);
             }
         }, 3600000); // 1 hour
+
+        // Audio player event handlers for better compatibility
+        audioPlayer.addEventListener('loadstart', () => {
+            console.log('Audio loading started');
+        });
+
+        audioPlayer.addEventListener('canplay', () => {
+            console.log('Audio can play');
+        });
+
+        audioPlayer.addEventListener('error', (e) => {
+            console.error('Audio error:', e);
+            console.error('Audio error details:', audioPlayer.error);
+        });
+
+        audioPlayer.addEventListener('loadedmetadata', () => {
+            console.log('Audio metadata loaded');
+        });
     </script>
 </body>
 </html>

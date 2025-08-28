@@ -1,7 +1,6 @@
 import os
 import uuid
 import time
-import pyttsx3
 import subprocess
 import tempfile
 from flask import Flask, render_template, request, jsonify, send_file, url_for
@@ -22,7 +21,7 @@ def index():
 
 @app.route('/convert', methods=['POST'])
 def convert_text_to_speech():
-    """Convert text to speech using Google TTS."""
+    """Convert text to speech using espeak (cross-platform)."""
     try:
         text = request.form.get('text', '').strip()
         uploaded_file = request.files.get('file')
@@ -46,92 +45,45 @@ def convert_text_to_speech():
         unique_id = str(uuid.uuid4())
         audio_filename = f"speech_{unique_id}.mp3"
         
-        # Use appropriate text-to-speech method based on OS
         try:
-            import platform
-            os_name = platform.system().lower()
+            # Use espeak directly for text-to-speech
+            wav_path = os.path.join(app.config['OUTPUT_FOLDER'], f"speech_{unique_id}.wav")
             
-            if os_name == 'darwin':  # macOS
-                # Use macOS 'say' command
-                temp_wav = os.path.join(app.config['OUTPUT_FOLDER'], f"temp_{unique_id}.wav")
-                subprocess.run([
-                    'say', 
-                    '-o', temp_wav,
-                    '-v', 'Samantha',
-                    '--file-format', 'WAVE',
-                    '--data-format', 'LEI16@22050',
-                    text
-                ], check=True, capture_output=True)
-                
-                # Convert WAV to MP3
-                mp3_path = os.path.join(app.config['OUTPUT_FOLDER'], audio_filename)
-                subprocess.run([
-                    'ffmpeg', '-y',
-                    '-i', temp_wav,
-                    '-acodec', 'libmp3lame',
-                    '-ab', '128k',
-                    '-ar', '22050',
-                    '-ac', '1',
-                    mp3_path
-                ], check=True, capture_output=True)
-                
-                # Clean up temporary WAV file
-                os.remove(temp_wav)
-                
-                return jsonify({
-                    'success': True,
-                    'filename': audio_filename,
-                    'download_url': url_for('download_file', filename=audio_filename),
-                    'play_url': url_for('download_file', filename=audio_filename)
-                })
-                
-            else:  # Linux/Windows - use pyttsx3
-                # Use pyttsx3 for cross-platform compatibility
-                try:
-                    engine = pyttsx3.init()
-                    engine.setProperty('rate', 150)
-                    engine.setProperty('volume', 0.9)
-                    
-                    # Try to use a good quality voice
-                    voices = engine.getProperty('voices')
-                    if voices:
-                        for voice in voices:
-                            if 'female' in voice.name.lower() or 'samantha' in voice.name.lower():
-                                engine.setProperty('voice', voice.id)
-                                break
-                        else:
-                            engine.setProperty('voice', voices[0].id)
-                    
-                    # Generate WAV file
-                    wav_path = os.path.join(app.config['OUTPUT_FOLDER'], f"speech_{unique_id}.wav")
-                    engine.save_to_file(text, wav_path)
-                    engine.runAndWait()
-                    
-                    # Convert to MP3 using ffmpeg
-                    mp3_path = os.path.join(app.config['OUTPUT_FOLDER'], audio_filename)
-                    subprocess.run([
-                        'ffmpeg', '-y',
-                        '-i', wav_path,
-                        '-acodec', 'libmp3lame',
-                        '-ab', '128k',
-                        '-ar', '22050',
-                        '-ac', '1',
-                        mp3_path
-                    ], check=True, capture_output=True)
-                    
-                    # Clean up WAV file
-                    os.remove(wav_path)
-                    
-                    return jsonify({
-                        'success': True,
-                        'filename': audio_filename,
-                        'download_url': url_for('download_file', filename=audio_filename),
-                        'play_url': url_for('download_file', filename=audio_filename)
-                    })
-                    
-                except Exception as fallback_error:
-                    print(f"Fallback also failed: {fallback_error}")
-                    return jsonify({'error': 'Text-to-speech conversion failed on all methods'}), 500
+            # Generate WAV file using espeak
+            subprocess.run([
+                'espeak',
+                '-w', wav_path,
+                '-v', 'en',  # English voice
+                '-s', '150',  # Speed
+                '-p', '50',   # Pitch
+                text
+            ], check=True, capture_output=True)
+            
+            # Convert to MP3 using ffmpeg
+            mp3_path = os.path.join(app.config['OUTPUT_FOLDER'], audio_filename)
+            subprocess.run([
+                'ffmpeg', '-y',
+                '-i', wav_path,
+                '-acodec', 'libmp3lame',
+                '-ab', '128k',
+                '-ar', '22050',
+                '-ac', '1',
+                mp3_path
+            ], check=True, capture_output=True)
+            
+            # Clean up WAV file
+            os.remove(wav_path)
+            
+            return jsonify({
+                'success': True,
+                'filename': audio_filename,
+                'download_url': url_for('download_file', filename=audio_filename),
+                'play_url': url_for('stream_audio', filename=audio_filename)
+            })
+            
+        except Exception as e:
+            print(f"Text-to-speech conversion failed: {e}")
+            return jsonify({'error': 'Text-to-speech conversion failed'}), 500
         
     except Exception as e:
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
@@ -147,6 +99,27 @@ def download_file(filename):
             return jsonify({'error': 'File not found'}), 404
     except Exception as e:
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
+
+@app.route('/stream/<filename>')
+def stream_audio(filename):
+    """Stream an audio file for playback."""
+    try:
+        file_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+        if os.path.exists(file_path):
+            # Set proper headers for audio streaming
+            response = send_file(
+                file_path,
+                mimetype='audio/mpeg',
+                as_attachment=False
+            )
+            # Add headers for better browser compatibility
+            response.headers['Accept-Ranges'] = 'bytes'
+            response.headers['Cache-Control'] = 'no-cache'
+            return response
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Streaming failed: {str(e)}'}), 500
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup_files():
