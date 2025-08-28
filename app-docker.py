@@ -78,7 +78,7 @@ def convert_text_to_speech():
                 'success': True,
                 'filename': audio_filename,
                 'download_url': url_for('download_file', filename=audio_filename),
-                'play_url': url_for('download_file', filename=audio_filename)
+                'play_url': url_for('stream_audio', filename=audio_filename)
             })
             
         except Exception as e:
@@ -99,6 +99,27 @@ def download_file(filename):
             return jsonify({'error': 'File not found'}), 404
     except Exception as e:
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
+
+@app.route('/stream/<filename>')
+def stream_audio(filename):
+    """Stream an audio file for playback."""
+    try:
+        file_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+        if os.path.exists(file_path):
+            # Set proper headers for audio streaming
+            response = send_file(
+                file_path,
+                mimetype='audio/mpeg',
+                as_attachment=False
+            )
+            # Add headers for better browser compatibility
+            response.headers['Accept-Ranges'] = 'bytes'
+            response.headers['Cache-Control'] = 'no-cache'
+            return response
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Streaming failed: {str(e)}'}), 500
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup_files():
